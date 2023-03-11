@@ -6,16 +6,35 @@ function elementDim(element,dim){
     var dimension = element.getBoundingClientRect()
 	var fulldimension
 	if(!("width" in dimension)){
-		fulldimension = {w:element.clientWidth,h:element.clientHeight}
+		fulldimension = {w:dimension.right - dimension.left,h:dimension.bottom - dimension.top}
 	}
 	else{fulldimension = {w:dimension.width,h:dimension.height}}
     return (dim in fulldimension)? fulldimension[dim] : fulldimension;
 }
 
+function inContact(e1,e2,boundary){
+	if(boundary == undefined){boundary = true}
+	c1 = e1.getBoundingClientRect(); c2 = e2.getBoundingClientRect()
+	return intercession(c1,c2,boundary) || intercession(c2,c1,boundary)
+}
+function intercession(c1,c2,boundary){
+	var horzI = inrange(c1.right,c1.left,c2.left,boundary) || inrange(c1.right,c1.left,c2.right,boundary)
+	var vertI = inrange(c1.top,c1.bottom,c2.bottom,boundary) || inrange(c1.top,c1.bottom,c2.top,boundary)
+	return horzI && vertI
+}
+function inrange(n1,n2,x,includen){
+	var min = Math.min(n1,n2)
+	var max = Math.max(n1,n2)
+	return (includen)? (x >= min && x <= max) : (x > min && x < max); 
+}
 function windowDim(dim){
     /*calculates and returns the specified dimension of the screen of the users 
     device or both if no valid dimension is specified*/
-    var dimension ={w:window.innerWidth,h:window.innerHeight}
+	if(window.innerHeight == undefined || window.innerWidth == undefined){
+		var html = document.getElementsByTagName("html")[0]
+		var dimension = elementDim(html)
+	}
+	else{var dimension ={w:window.innerWidth,h:window.innerHeight}}
     return (dim in dimension)? dimension[dim] : dimension
 }
 
@@ -146,7 +165,19 @@ function single(word,target){
 	var targetExp = new RegExp(target+"+","g")
 	return word.replace(targetExp,target)
 }
-
+function reverse(string){
+	//reverses a string
+	return string.split("").reverse().join("")
+}
+function trim(string){
+	if("trim" in string.constructor.prototype){return string.trim()}
+	var firstNonSpace = string.search(/\S/)
+	if(firstNonSpace > 0){string = string.slice(firstNonSpace)}
+	string = reverse(string)
+	var lastNonSpace = string.search(/\S/)
+	if(lastNonSpace > 0){string = string.slice(lastNonSpace)}
+	return reverse(string)
+}
 function isNumeric(number){
 	//returns whether or not a variable is a number
 	numberString=String(number); number=Number(number)
@@ -186,6 +217,10 @@ function inarray(array,word,cs){
 	}
 	return false
 }
+function index(string,pos){
+	//returns the element at position 'pos" of string 'string'
+	return string.split("")[pos] 
+}
 function isEmpty(str,includeSpace){
 	/*returns whether or not a string is empty, if the variable isn't a string
 	then it is treated as non empty,
@@ -197,4 +232,72 @@ function isEmpty(str,includeSpace){
 		return str.length < 1
 	}
 	return false
+}
+function anyFileExt(file){
+	return file.split(".").length > 1
+}
+function isSameUrl(url1,url2,indexName){
+	var pathSperators = ["/","\\"]
+	indexName = (indexName)? indexName : ""
+	url1 = trim(url1);
+	url2 = trim(url2);
+	url1 = addIndex(url1); url2 = addIndex(url2)
+	return equalString(url1,url2)
+	function addIndex(url){
+		url = reverse(url)
+		var filename = ""
+		var lastChar = index(url,0); lastChar = (inarray(pathSperators,lastChar))? "" : pathSperators[0] 
+		var lastSlash = url.search(/(\\|\/)/)
+		if(lastSlash > 0){filename = url.slice(0,lastSlash)}
+		url = reverse(url)
+		if(!anyFileExt(filename)){return url + lastChar + indexName}
+		else{return url}
+	}
+}
+
+//task indicators
+var a = function(){
+	var loaderInstance = new loader()
+	progress.prototype = loaderInstance
+}()
+
+function loader(){
+	//constructor for all tasks indicators
+    var container = document.createElement("div"); container.className = "absolute top left full-width full-height"
+	container.style.transition = "none"
+	this.construct = function(object){
+		object.window = container
+		object.stop = function(){
+			remove(this.window)
+		}
+	}
+}
+function progress(element,taskName,max){
+	//constructor for the progress indicators
+	var self = this
+	var defaultMax = 100
+	this.element = element
+	this.taskName = (taskName)? taskName : "Loading..."
+	this.max = (isNumeric(max))? max : defaultMax
+	this.stat = 0
+	this.start = function(){
+		if(!this.loadElement){
+			this.loadElement = document.createElement("div"); this.loadElement.className = "center-text full-width"
+			this.label = document.createElement("label"); this.label.innerHTML = this.taskName
+			this.label.className = "block auto-margin"
+			this.progress = document.createElement("progress"); this.progress.max = this.max
+			this.progress.className = "normal"
+			this.progress.style.transition = "none"
+			append(this.loadElement,[this.label,this.progress])
+		}
+		this.stat = 0
+		this.progress.value = this.stat
+		this.element.appendChild(this.loadElement)
+	}
+	this.stop = function(){remove(this.loadElement)}
+	this.makeProgress = function(to){
+		//increases the progress of a task to "to"
+		this.stat = to
+		this.progress.value = this.stat
+	}
 }

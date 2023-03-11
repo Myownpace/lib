@@ -1,7 +1,5 @@
-
 function Req(url,method,message){
-    this.object = new XMLHttpRequest()
-    this.url = url
+    this.object = new XMLHttpRequest(); this.url = url
     this.stimulis = [
         "onload","onabort","ontimeout","onloadend","onerror",
         "onloadstart","onprogress","onreadystatechange"
@@ -19,8 +17,8 @@ function Req(url,method,message){
             if(!(this.loadInterface instanceof this.loadClass)){
                 this.loadInterface = new this.loadClass(this.loadElement)
             }
+            this.loadInterface.start()
         }
-        
         object.open(this.method.toUpperCase(),this.url)
         object.responseType = (this.responseType)? this.responseType : 
         object.responseType
@@ -35,11 +33,18 @@ function Req(url,method,message){
 
     this.addReact = function(stimuli,response){
         var self = this
-        if(isFunction(response)){
-            this.object[stimuli] = function(){
-                if(self.object.readyState == 4 & self.loadClass){
-                    self.loadInterface.stop()
-                }
+        this.object[stimuli] = function(e){
+            if(self.loadInterface && self.loadInterface instanceof progress && stimuli == "onprogress"){
+                var totalDataVol = e.total
+                var loadedDataVol = e.loaded
+                var loadedRatio = totalDataVol / loadedDataVol
+                var loadProgress = loadedRatio * self.loadInterface.max
+                self.loadInterface.makeProgress(loadProgress)
+            }
+            if(self.object.readyState == 4 && self.loadClass){
+                self.loadInterface.stop()
+            }
+            if(isFunction(response)){
                 response(self)
             }
         }
