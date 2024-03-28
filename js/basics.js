@@ -1,4 +1,18 @@
-
+//for browser compatibility
+if(!("getElementsByClassName" in document)){
+	document.getElementsByClassName = function(className){
+		var root = document.getElementsByTagName("html")[0]
+		var elements = []
+		function proccess(element){
+			if(hasClass(element,className)){elements.push(element)}
+			var children = element.children
+			for(var i = 0; i < children.length; i++){
+				proccess(children[i])
+			}
+		}
+		return elements
+	}
+}
 //DOM functions
 function elementDim(element,dim){
     /*calculates and returns the specified dimension of an element or both
@@ -12,6 +26,17 @@ function elementDim(element,dim){
     return (dim in fulldimension)? fulldimension[dim] : fulldimension;
 }
 
+function getAttribute(element,attribute){
+	return element.getAttribute(attribute)
+}
+function stopPropagation(e){
+	try{
+		e.stopPropagation()
+	}
+	catch(err){
+		e.cancelBubble = true
+	}
+}
 function inContact(e1,e2,boundary){
 	if(boundary == undefined){boundary = true}
 	c1 = e1.getBoundingClientRect(); c2 = e2.getBoundingClientRect()
@@ -97,6 +122,13 @@ function remove(element){
 		catch(err){}
 	}
 }
+function removeChildren(element){
+	/*removes all element nodes of an element*/
+	var children = element.children
+	for(var i = 0; i < children.length;){
+		remove(children[i])
+	}
+}
 function append(parent,elements){
 	if(elements instanceof Array){
 		for(var i=0; i < elements.length; i++){
@@ -106,27 +138,128 @@ function append(parent,elements){
 	}
 	parent.appendChild(elements)
 }
+function prepend(parent,elements){
+	if(elements instanceof Array){
+		for(var i = 0; i < elements.length; i++){append(parent,elements[i])}
+		return
+	}
+	if("prepend" in parent){parent.prepend(elements)}
+	else{
+		if(parent.children.length > 0){parent.insertBefore(parent.firstElementChild,elements)}
+		else{parent.appendChild(elements)}
+	}
+}
 function customAlert(msg){
-	var alertTime = 5000 //3 seconds or 3000 milliseconds
-	var container = document.createElement("div"); container.className = "center-text fixed left full-width"
+	var alertTime = 5000 //5 seconds or 5000 milliseconds
+	var container = document.createElement("div"); 
+	container.className = "center-text fixed left full-width custom-alert"
 	container.style.bottom = "5%"
 	var msgBox = document.createElement("span"); msgBox.innerHTML = msg; 
 	msgBox.className = "black-bg curved white small-text"; msgBox.style.padding = "1%"
 	container.appendChild(msgBox)
 	document.body.appendChild(container)
-	var opacity = 1
-	var interval = setInterval(function(){opacity -= 100/alertTime; container.style.opacity = opacity},100)
-	setTimeout(function(){clearInterval(interval); remove(container)},alertTime)
+	var fader = new customFade(container);
 }
+
+function customFade(element,fadeTime,fadeRate,afterFade){
+	var opacity = 1
+	var self = this
+	fadeTime = (!fadeTime)? 5000 : fadeTime
+	fadeRate = (!fadeRate)? 100 : fadeRate
+	addEvent(element,"click",function(){self.resetFade()})
+	this.resetFade = function(){
+		clearTimeout(this.timeout)
+		clearInterval(this.interval)
+		opacity = 1
+		this.start()
+	}
+	this.stop = function(){clearInterval(this.interval); remove(element); if(isFunction(afterFade)){afterFade()}}
+	this.start = function(){
+		this.interval = setInterval(function(){opacity -= fadeRate/fadeTime; element.style.opacity = opacity},fadeRate)
+		this.timeout = setTimeout(function(){self.stop()},fadeTime)
+	}
+	this.start()
+}
+
 function copy(text,cb){
+	if(!isFunction(cb)){cb = defaultCb}
 	try{
 		navigator.clipboard.writeText(text)
-		.then(defaultCb)
+		.then(cb)
 	}
-	catch(err){}
+	catch(err){
+		document.execCommand("copy",false,text)
+		console.log(document.execCommand)
+	}
 	function defaultCb(){
 		customAlert("Item copied to clipboard")
 	}
+}
+function inView(element){
+	/*checks if an element is in the visible view port*/
+	var coord = element.getBoundingClientRect()
+	var winDim = windowDim()
+	var topVisible = coord.top >= 0 && coord.top <= winDim.h
+	var bottomVisible = coord.bottom >= 0 && coord.bottom <= winDim.h
+	var leftVisible = coord.left >= 0 && coord.left <= winDim.w
+	var rightVisible = coord.right >= 0 && coord.right <= winDim.w
+	console.log(coord)
+	return (topVisible || bottomVisible) && (leftVisible || rightVisible); 
+}
+function scrollNShow(nodes){
+	var defaultClass = "scroll-n-view"
+	var visibleClass = "visible"
+	var invisibleClass = "invisible"
+	var run = true
+	var throttleDuration = 500 //in milliseconds
+	nodes = (nodes)? nodes : document.getElementsByClassName(defaultClass)
+	for(var i = 0; i < nodes.length; i++){
+		changeClass(nodes[i],"",defaultClass)
+	}
+	function appear(node){
+		changeClass(node,invisibleClass,visibleClass)
+	}
+	function disappear(node){
+		changeClass(node,visibleClass,invisibleClass)
+	}
+	function handleScroll(){
+		for(var i = 0; i < nodes.length; i++){
+			var node = nodes[i]
+			if(inView(node)){appear(node)}
+			else{disappear(node)}
+			console.log(node)
+		}
+	}
+	function scrollThrottle(){
+		if(!run){return}
+		run = false
+		setTimeout(function(){run = true; handleScroll()},throttleDuration)
+	}
+	handleScroll()
+	addEvent(document,"scroll",scrollThrottle)
+}
+function getCookie(name){
+	//gets the cookie "name"
+	return getCookies()[name]
+}
+function getCookies(){
+	//gets all the cookies
+	var cookies = document.cookie.split("; ")
+	var cookieObjects = {}
+	for(var i = 0; i < cookies.length; i++){
+		var thisCookie = cookies[i].split("=")
+		if(thisCookie.length != 2){continue}
+		cookieObjects[thisCookie[0]] = thisCookie[1]
+	}
+	return cookieObjects
+}
+function setCookie(name,value,expires,path){
+	if(isNumeric(expires)){
+		var now = new Date(); now.setTime(now.getTime() + expires); expires = ";expires=" + now.toUTCString()
+	}
+	else{expires = ""}
+	path = (path)? ";path="+path.toString() : ""
+	document.cookie = name.toString()+"="+value.toString()+expires+path
 }
 //handles movement
 function moveTo(element,x,y){
@@ -156,7 +289,6 @@ function orgCoord(element){
 	orgPos(element)
 	return element.getBoundingClientRect()
 }
-
 //data manipulation
 function single(word,target){
 	/*searches "word" and makes sure that there are no more than 2 consecutive
@@ -209,11 +341,11 @@ function singleOrPlural(number,word){
 function inarray(array,word,cs){
 	/*searchs an array and returns whether or not "word" is in the array
 		# the parameter "cs" specifies whether or not this search is case
-		sensitive
+		sensitive, true means that it is not while false means that it is
 	*/
 	for(var i=0; i < array.length; i++){
-		if(cs){if(equalString(word,array[i])){return true}}
-		else{if(word == array[i]){return true}}
+		if(cs){if(equalString(word,array[i])){return i}}
+		else{if(word == array[i]){return i}}
 	}
 	return false
 }
@@ -282,22 +414,23 @@ function progress(element,taskName,max){
 	this.stat = 0
 	this.start = function(){
 		if(!this.loadElement){
-			this.loadElement = document.createElement("div"); this.loadElement.className = "center-text full-width"
+			this.loadElement = document.createElement("div"); 
+			this.loadElement.className = "center-text full-width progress-loader"
 			this.label = document.createElement("label"); this.label.innerHTML = this.taskName
 			this.label.className = "block auto-margin"
-			this.progress = document.createElement("progress"); this.progress.max = this.max
-			this.progress.className = "normal"
-			this.progress.style.transition = "none"
+			this.progress = document.createElement("div"); this.progress.className = "progress"
+			this.progressIndicator = document.createElement("div"); this.progressIndicator.className = "indicator"
+			append(this.progress,this.progressIndicator)
 			append(this.loadElement,[this.label,this.progress])
 		}
 		this.stat = 0
-		this.progress.value = this.stat
+		this.makeProgress(this.stat)
 		this.element.appendChild(this.loadElement)
 	}
 	this.stop = function(){remove(this.loadElement)}
 	this.makeProgress = function(to){
 		//increases the progress of a task to "to"
-		this.stat = to
-		this.progress.value = this.stat
+		this.progressIndicator.style.width = ((to * 100) / this.max).toString() + "%"
+		console.log(this.progressIndicator.style.width)
 	}
 }
